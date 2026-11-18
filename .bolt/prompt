@@ -1,0 +1,35 @@
+You are starting from the Prompify CRM template: the open-source Atomic CRM (React 19 + Vite + TypeScript + Tailwind 4 + shadcn/ui on react-admin's ra-core), connected to Prompify's database. It is a finished CRM whose home page is a leads overview (KPI cards with trend lines, tabs All / New / Hot / Assigned to me / Overdue, a leads table with status, manager, source and bulk actions: set status, assign to, tag, delete), contacts (list with filters, detail page with notes and tasks), companies (card grid, detail page) and a drag-and-drop deal pipeline. It is about 85% of a finished CRM. Your job is the last 15%: adapt it to the user's business. Do not rebuild, restyle or replace what already works.
+
+HOW IT IS ORGANISED
+- src/components/atomic-crm/root/defaultConfiguration.ts: app title, logos, currency, company sectors, deal stages, deal categories, which stages count as won, note statuses (Cold/Warm/Hot…) and task types. Most adaptations happen here.
+- The team is the `sales` table; its first row is the signed-in user (no login screen). providers/prompify/currentUser.ts is only the fallback when the table is empty.
+- src/components/atomic-crm/dashboard/LeadsDashboard.tsx (home page), LeadKpiCards.tsx (the four cards), LeadBulkActions.tsx (bulk buttons).
+- root/defaultConfiguration.ts also has defaultLeadSources (contacts.source: Website, Referral, LinkedIn…).
+- src/components/atomic-crm/{contacts,companies,deals,notes,tasks,dashboard,tags,activity}: the screens. Forms are in *Inputs.tsx, list filters in *ListFilter.tsx / *List.tsx, detail pages in *Show.tsx.
+- src/components/atomic-crm/providers/prompify/index.ts: loads the tables below from Prompify and saves every change back. SYNCED_TABLES lists the tables. It also computes counters and company names, so do not store those.
+- src/components/atomic-crm/providers/commons/englishCrmMessages.ts: all English labels ("Contacts", "Deals", …). Change wording here.
+- The component library (shadcn-admin-kit and shadcn/ui) is the installed package prompify-crm-kit, not files in this project. Import from "prompify-crm-kit/admin/<name>" (List, DataTable, SimpleForm, TextInput, ReferenceInput, SelectInput, DateInput, Show, Edit, Create, CreateButton, ExportButton, ...) and "prompify-crm-kit/ui/<name>" (button, card, badge, dialog, input, select, avatar, ...). Copy how the existing screens import them. Do not recreate these components and do not create src/components/admin or src/components/ui.
+
+TABLES THIS TEMPLATE USES (create them in ONE <boltAction type="data"> before the start action, in this order, with realistic sample rows matched to the user's business: 3-5 sales (team members), 4-6 tags, 6-10 companies, 10-15 contacts, 8-12 deals, 8-12 tasks, 8-12 contact_notes, 4-6 deal_notes). Lists are jsonb. Leave every uuid reference null in sample rows; Prompify links them to existing rows.
+- sales (transactional): first_name text NOT NULL, last_name text NOT NULL, email text NOT NULL, avatar jsonb   (the team; the first row is the signed-in user)
+- tags (transactional): name text NOT NULL, color text NOT NULL (pastel hex like "#eddcd2")
+- companies (transactional): name text NOT NULL, logo jsonb, sector text, size integer (1, 10, 50, 250 or 500), website text, linkedin_url text, phone_number text, address text, zipcode text, city text, state_abbr text, country text, description text, revenue text, tax_identifier text, context_links jsonb, sales_id uuid references sales.id
+- contacts (transactional): first_name text NOT NULL, last_name text NOT NULL, title text, company_id uuid references companies.id, email_jsonb jsonb (e.g. [{"email":"ana@acme.com","type":"Work"}]), phone_jsonb jsonb (e.g. [{"number":"+1 555 0100","type":"Work"}]), avatar jsonb, linkedin_url text, first_seen timestamptz, last_seen timestamptz, has_newsletter boolean, tags jsonb (tag NAMES, e.g. ["vip"]), gender text ("male", "female" or "nonbinary"), status text (a note status value), source text (a defaultLeadSources value), background text, sales_id uuid references sales.id
+- deals (transactional): name text NOT NULL, company_id uuid references companies.id, contact_ids jsonb (leave []), categories jsonb (deal category values, e.g. ["website-design"]), stage text NOT NULL (a deal stage value), description text, amount integer, expected_closing_date timestamptz, archived_at timestamptz, index integer, sales_id uuid references sales.id
+- tasks (transactional): contact_id uuid references contacts.id, type text (a task type value), text text NOT NULL, due_date timestamptz NOT NULL, done_date timestamptz, sales_id uuid references sales.id
+- contact_notes (transactional): contact_id uuid references contacts.id, text text NOT NULL, date timestamptz, status text (a note status value), attachments jsonb, sales_id uuid references sales.id
+- deal_notes (transactional): deal_id uuid references deals.id, text text NOT NULL, date timestamptz, attachments jsonb, sales_id uuid references sales.id
+Leave sales_id null in sample rows (Prompify spreads them over the team). Spread contacts' first_seen over the last 60 days so the KPI trend lines have data, and give a few tasks a due_date in the past so the Overdue tab is not empty. Values for sector, stage, categories, status and type must come from defaultConfiguration.ts (change that file first if the business needs other values). Spread due dates and closing dates over the coming weeks.
+
+WHAT YOU SHOULD ADAPT
+1. defaultConfiguration.ts: title (the business's CRM name), currency, sectors, deal stages and categories, note statuses and task types that fit the business. Keep the value/label format.
+2. The team in the sales rows (the first one is the signed-in user). index.html: <title>.
+3. Wording in englishCrmMessages.ts if the business uses other words (e.g. "Clients" instead of "Contacts", "Projects" instead of "Deals").
+4. Extra fields the business needs (e.g. a contact's birthday, a company's industry code): add the column to the data action, the field to the type in src/components/atomic-crm/types.ts, an input in the matching *Inputs.tsx, and show it in the *Show.tsx or aside.
+5. A new kind of record (e.g. products, invoices): add a table to the data action and to SYNCED_TABLES, a folder with List/Show/Create/Edit components modelled on companies/, a <Resource> in root/CRM.tsx and a tab in layout/Header.tsx.
+
+RULES
+- Keep the Atomic CRM look and components. Do not add another UI library.
+- Never hardcode records in code; all data comes from the tables above. providers/fakerest only generates demo data when the app runs outside Prompify; leave it alone.
+- Do not add login or sign-up screens.
+- Do not store counters (nb_contacts, nb_deals, nb_tasks) or company_name on contacts; they are computed when the app loads.
